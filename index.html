@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Leaflet JS</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <style>
+        html,
+        body,
+        #map {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script>
+        // Inisialisasi peta
+        var map = L.map("map").setView([-8.3202123, 123.0180359], 13);
+
+        // --- BASEMAPS ---
+        var osm = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        });
+
+        var Esri_WorldImagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+        });
+
+        var rupabumiindonesia = L.tileLayer('https://geoservices.big.go.id/rbi/rest/services/BIG/Rupabumi_Indonesia/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Badan Informasi Geospasial (BIG)'
+        });
+
+        // Menambahkan basemap default ke peta
+        osm.addTo(map);
+
+        // --- OVERLAY LAYERS ---
+        // 1. GeoJSON Point Toponimi
+        var toponimi = L.geoJSON(null, {
+            onEachFeature: function (feature, layer) {
+                var nama = feature.properties.TOPONIMI || feature.properties.NAMOBJ || "Toponimi";
+                var img = feature.properties.image ? "<br><img src='images/" + feature.properties.image + "' width='200'>" : "";
+                
+                var popup_content = "Nama: " + nama + "<br>" +
+                    "Koordinat: " + feature.geometry.coordinates[1] + ", " + feature.geometry.coordinates[0] + img;
+
+                layer.bindPopup(popup_content);
+                layer.bindTooltip(nama, {
+                    direction: "left",
+                    sticky: true
+                });
+            }
+        });
+
+        $.getJSON("geojsn/toponimi.geojson", function (data) {
+            toponimi.addData(data);
+            map.addLayer(toponimi);
+        });
+
+        // 2. GeoJSON Polyline Jalan
+        var jalan = L.geoJSON(null, {
+            style: function (feature) {
+                return {
+                    color: "red",
+                    opacity: 1,
+                    weight: 3,
+                };
+            },
+            onEachFeature: function (feature, layer) {
+                var namaJalan = feature.properties.NAMA_UNSUR || "Jalan";
+                var panjang = feature.properties.panjang_m || "-";
+
+                var popup_content = "Nama Jalan / Jenis: " + namaJalan + "<br>" +
+                    "Panjang: " + panjang;
+
+                layer.bindPopup(popup_content);
+                layer.bindTooltip(namaJalan, {
+                    direction: "auto",
+                    sticky: true
+                });
+            }
+        });
+
+        $.getJSON("geojsn/jalan.geojson", function (data) {
+            jalan.addData(data);
+            map.addLayer(jalan);
+        });
+
+        // 3. GeoJSON Polygon Jumlah Penduduk
+        var jumlah_penduduk = L.geoJSON(null, {
+            style: function (feature) {
+                return {
+                    color: "gray",
+                    opacity: 1,
+                    weight: 1,
+                    fillColor: "#ff0000",
+                    fillOpacity: 0.8,
+                };
+            },
+            onEachFeature: function (feature, layer) {
+                var namaObjek = feature.properties.NAMOBJ || "Wilayah";
+                var JmlPenduduk = feature.properties.jumlah_penduduk_kecamatan || "-";
+
+                var popup_content = "Nama Objek / Wilayah: " + namaObjek + "<br>" +
+                    "Jumlah Penduduk: " + JmlPenduduk;
+
+                layer.bindPopup(popup_content);
+
+                layer.on({
+                    mouseover: function (e) {
+                        var layer = e.target;
+                        layer.setStyle({
+                            weight: 2,
+                            color: "#000",
+                            fillOpacity: 0.5
+                        });
+                    },
+                    mouseout: function (e) {
+                        jumlah_penduduk.resetStyle(e.target);
+                    }
+                });
+            }
+        });
+
+        $.getJSON("geojsn/jumlah_penduduk.geojson", function (data) {
+            jumlah_penduduk.addData(data);
+            map.addLayer(jumlah_penduduk);
+        });
+
+        // --- CONTROL LAYER ---
+        var baseMaps = {
+            "OpenStreetMap": osm,
+            "Esri World Imagery": Esri_WorldImagery,
+            "Rupa Bumi Indonesia": rupabumiindonesia,
+        };
+
+        var overlayMaps = {
+            "Toponimi (Point)": toponimi,
+            "Jalan (Polyline)": jalan,
+            "Jumlah Penduduk (Polygon)": jumlah_penduduk,
+        };
+
+        var controllayer = L.control.layers(baseMaps, overlayMaps, { collapsed: false });
+        controllayer.addTo(map);
+    </script>
+</body>
+
+</html>
